@@ -58,3 +58,7 @@ Built and run on macOS 26 (Apple silicon) with `scripts/build-app.sh`. Core test
 Not yet checked: Intel Macs, macOS 13–15, Reduce Motion, and Codex timeout recovery. Provider contracts can change with CLI versions; the Claude per-model rows depend on an undocumented cache in `~/.claude.json`.
 
 Keep scope small: two quota readers, one model, one renderer, one dashboard. No plugin system or generic provider framework.
+
+## License
+
+MIT. See [LICENSE](LICENSE). The license covers TokenChomp's own code only; TokenFish is a separate project with its own terms.
