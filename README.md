@@ -2,6 +2,10 @@
 
 A small native macOS menu-bar companion that shows how much of your Codex and Claude Code subscription limits are left: the Claude session window, the weekly window, per-model weekly limits such as Fable, and Codex's windows, each with its reset time. SwiftUI + AppKit, macOS 13+, no third-party dependencies, server, account, telemetry, or credential storage.
 
+<img width="358" height="257" alt="image" src="https://github.com/user-attachments/assets/bfe00154-994a-482a-af33-059f7047b8a5" />
+
+
+
 ## Credit
 
 TokenChomp exists because of **[TokenFish](https://github.com/pixelsncodes/tokenfish)** by [@pixelsncodes](https://github.com/pixelsncodes), "a little fish for your AI limits": a Windows tray companion for Codex and Claude Code. The core ideas here come from TokenFish:
