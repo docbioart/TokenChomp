@@ -61,7 +61,10 @@ public enum QuotaParser {
         var quotas: [Quota] = windows.compactMap { key, title in
             guard let w = limits[key] as? [String: Any], let used = number(w["used_percentage"]),
                   (0...100).contains(used) else { return nil }
-            return Quota(id: key, title: title, used: used, resetsAt: date(w["resets_at"]), observedAt: now)
+            var q = Quota(id: key, title: title, used: used, resetsAt: date(w["resets_at"]), observedAt: now)
+            // The bridge re-runs every 5–10 min while idle (statusLine.refreshInterval), so allow 15.
+            q.maxAge = 15 * 60
+            return q
         }
         for bucket in limits["model_scoped"] as? [[String: Any]] ?? [] {
             // Allowlist: display_name, utilization, resets_at. Utilization is a 0...1 fraction upstream.
@@ -69,8 +72,10 @@ public enum QuotaParser {
                   !name.isEmpty, name.count <= 24, let raw = number(bucket["utilization"]) else { continue }
             let used = raw <= 1 ? raw * 100 : raw
             guard (0...100).contains(used), !quotas.contains(where: { $0.id == "model:" + name }) else { continue }
-            quotas.append(Quota(id: "model:" + name, title: name + " weekly", used: used,
-                                resetsAt: date(bucket["resets_at"]), observedAt: now))
+            var q = Quota(id: "model:" + name, title: name + " weekly", used: used,
+                          resetsAt: date(bucket["resets_at"]), observedAt: now)
+            q.maxAge = 15 * 60
+            quotas.append(q)
         }
         return quotas
     }
@@ -91,7 +96,9 @@ public enum QuotaParser {
                   !quotas.contains(where: { $0.id == "model:" + name }) else { continue }
             var q = Quota(id: "model:" + name, title: name + " weekly", used: used,
                           resetsAt: date(row["resets_at"]), observedAt: observed)
-            q.maxAge = 2 * 3600
+            // Weekly usage only rises until reset, so an old reading is still a valid floor:
+            // it goes stale at reset, not on age. The row shows its age instead.
+            q.maxAge = 8 * 86_400
             quotas.append(q)
         }
         return quotas

@@ -78,7 +78,8 @@ struct Dashboard: View {
             Button("Copy Claude bridge configuration") {
                 let path = Bundle.main.executableURL?.path ?? CommandLine.arguments[0]
                 let quoted = "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "' --claude-bridge"
-                let object: [String: Any] = ["statusLine": ["type": "command", "command": quoted]]
+                // refreshInterval keeps the bridge fed while a session sits idle; 5 min spares the battery.
+                let object: [String: Any] = ["statusLine": ["type": "command", "command": quoted, "refreshInterval": 300]]
                 if let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]),
                    let text = String(data: data, encoding: .utf8) {
                     NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
@@ -113,7 +114,7 @@ struct QuotaRow: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text([prefix, quota.title].compactMap { $0 }.joined(separator: " "))
                         .font(.caption).lineLimit(1).truncationMode(.tail)
-                    Text(stale ? "stale" : shortReset(now: timeline.date))
+                    Text(caption(now: timeline.date, stale: stale))
                         .font(.caption2).foregroundStyle(stale ? Color.orange : Color.secondary).lineLimit(1)
                 }
                 .frame(width: prefix == nil ? 92 : 118, alignment: .leading)
@@ -128,6 +129,17 @@ struct QuotaRow: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(prefix ?? "") \(quota.title): \(Int(quota.remaining.rounded())) percent left, \(resetText(now: timeline.date))\(stale ? ", stale" : "")")
         }
+    }
+    /// Why a reading is stale matters: a passed reset is not the same as a silent provider.
+    private func caption(now: Date, stale: Bool) -> String {
+        if let reset = quota.resetsAt, reset <= now { return "reset due · awaiting update" }
+        if stale { return failed ? "refresh failed" : "no update · \(age(now: now)) old" }
+        if quota.id.hasPrefix("model:"), now.timeIntervalSince(quota.observedAt) > 900 { return "\(age(now: now)) old · " + shortReset(now: now) }
+        return shortReset(now: now)
+    }
+    private func age(now: Date) -> String {
+        let minutes = max(0, Int(now.timeIntervalSince(quota.observedAt) / 60))
+        return minutes >= 1440 ? "\(minutes / 1440)d" : minutes >= 60 ? "\(minutes / 60)h" : "\(minutes)m"
     }
     private func shortReset(now: Date) -> String {
         guard let reset = quota.resetsAt else { return "no reset time" }
