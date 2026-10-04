@@ -134,7 +134,7 @@ struct QuotaRow: View {
     private func caption(now: Date, stale: Bool) -> String {
         if let reset = quota.resetsAt, reset <= now { return "reset due · awaiting update" }
         if stale { return failed ? "refresh failed" : "no update · \(age(now: now)) old" }
-        if quota.id.hasPrefix("model:"), now.timeIntervalSince(quota.observedAt) > 900 { return "\(age(now: now)) old · " + shortReset(now: now) }
+        if quota.id.hasPrefix("model:"), now.timeIntervalSince(quota.observedAt) > 900 { return "\(age(now: now)) old · " + shortReset(now: now).replacingOccurrences(of: "resets ", with: "↻ ") }
         return shortReset(now: now)
     }
     private func age(now: Date) -> String {
