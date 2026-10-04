@@ -59,13 +59,16 @@ import ChompCore
     func start() {
         guard timer == nil else { return }
         refresh()
+        // Unwrap before the Task: older Swift (5.10) rejects a captured weak var inside it.
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
+            guard let store = self else { return }
+            Task { @MainActor in store.refresh() }
         }
         iconTimer = Timer.scheduledTimer(withTimeInterval: 0.18, repeats: true) { [weak self] _ in
+            guard let store = self else { return }
             Task { @MainActor in
-                guard let self, self.iconCanAnimate, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-                self.iconPhase = Date().timeIntervalSinceReferenceDate
+                guard store.iconCanAnimate, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+                store.iconPhase = Date().timeIntervalSinceReferenceDate
             }
         }
     }
