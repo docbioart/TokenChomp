@@ -55,6 +55,19 @@ final class QuotaTests: XCTestCase {
         XCTAssertFalse(stored.contains("secret"))
         XCTAssertTrue(try QuotaParser.claudeSnapshot(Data(#"{"numStartups":3}"#.utf8)).isEmpty)
     }
+    func testClaudeUsageEndpointMatchesBridgeIds() throws {
+        let data = Data(#"{"five_hour":{"utilization":4.0,"resets_at":"2027-01-15T12:39:59.654277+00:00","limit_dollars":null},"seven_day":{"utilization":1.0,"resets_at":"2027-01-20T16:59:59.654302+00:00"},"seven_day_opus":null,"spend":{"used":{"amount_minor":0}},"limits":[{"kind":"session","percent":4,"resets_at":null,"scope":null},{"kind":"weekly_all","percent":1,"resets_at":null,"scope":null},{"kind":"weekly_scoped","percent":1,"resets_at":"2027-01-20T16:59:59.654562+00:00","scope":{"model":{"id":"secret","display_name":"Fable"}}}]}"#.utf8)
+        let q = try QuotaParser.claudeUsage(data, now: now, maxAge: 660)
+        XCTAssertEqual(q.map(\.id), ["five_hour", "seven_day", "model:Fable"])
+        XCTAssertEqual(q.map(\.title), ["Session", "Weekly", "Fable weekly"])
+        XCTAssertEqual(q[0].used, 4)
+        XCTAssertEqual(q.map(\.observedAt), [now, now, now])
+        XCTAssertNotNil(q[2].resetsAt)
+        XCTAssertFalse(q[0].isStale(at: now.addingTimeInterval(600)))
+        XCTAssertTrue(q[0].isStale(at: now.addingTimeInterval(661)))
+        XCTAssertFalse(String(decoding: try JSONEncoder().encode(q), as: UTF8.self).contains("secret"))
+        XCTAssertTrue(try QuotaParser.claudeUsage(Data(#"{"error":{"type":"authentication_error"}}"#.utf8)).isEmpty)
+    }
     func testGhostThresholdAndClosingGap() {
         XCTAssertFalse(Quota(id: "a", title: "test", used: 69).hasGhost)
         let warning = Quota(id: "a", title: "test", used: 70)

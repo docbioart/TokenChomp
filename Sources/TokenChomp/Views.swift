@@ -4,11 +4,11 @@ import ChompCore
 struct Dashboard: View {
     @ObservedObject var store: UsageStore
     var compact = false
-    private struct Source { let name: String; let tint: Color; let quotas: [Quota]; let error: String? }
+    private struct Source { let name: String; let tint: Color; let quotas: [Quota]; let error: String?; var note: String? = nil }
     private var sources: [Source] {
         var list: [Source] = []
         if store.codexEnabled { list.append(Source(name: "Codex", tint: .mint, quotas: store.displayedCodex, error: store.demo ? nil : store.codexError)) }
-        if store.claudeEnabled { list.append(Source(name: "Claude", tint: .orange, quotas: store.displayedClaude, error: store.demo ? nil : store.claudeError)) }
+        if store.claudeEnabled { list.append(Source(name: "Claude", tint: .orange, quotas: store.displayedClaude, error: store.demo ? nil : store.claudeError, note: store.demo ? nil : store.claudeNote)) }
         return list
     }
     var body: some View {
@@ -33,7 +33,7 @@ struct Dashboard: View {
             Text("TokenChomp").font(.system(.title3, design: .rounded, weight: .bold))
             Spacer()
             if store.demo { Text("DEMO").font(.caption2.bold()).foregroundStyle(.orange) }
-            Button { store.refresh() } label: { Image(systemName: "arrow.clockwise") }
+            Button { store.refresh(manual: true) } label: { Image(systemName: "arrow.clockwise") }
                 .buttonStyle(.borderless).disabled(store.refreshing || store.demo).help("Refresh quota")
         }
     }
@@ -64,6 +64,7 @@ struct Dashboard: View {
             } else {
                 ForEach(source.quotas) { QuotaRow(quota: $0, animated: store.animations, failed: source.error != nil) }
                 if let error = source.error { Text(error).font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+                else if let note = source.note { Text(note).font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
             }
         }
         .padding(10).background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
@@ -73,6 +74,9 @@ struct Dashboard: View {
             Toggle("Codex", isOn: $store.codexEnabled).onChange(of: store.codexEnabled) { _ in store.refresh() }
             TextField("Absolute path to codex", text: $store.codexPath).textFieldStyle(.roundedBorder)
             Toggle("Claude Code", isOn: $store.claudeEnabled).onChange(of: store.claudeEnabled) { _ in store.refresh() }
+            Toggle("Poll Claude usage directly with Claude Code's sign-in", isOn: $store.claudeDirect)
+                .onChange(of: store.claudeDirect) { _ in store.refresh() }
+            Text("Reads the Claude Code token from the Keychain the same way Claude Code does and asks Anthropic's usage endpoint every 5 minutes, every 15 on battery or Low Power Mode, never while the Mac or its displays sleep. Covers Session, Weekly, and per-model limits without the bridge.").font(.caption2).foregroundStyle(.secondary)
             Toggle("Per-model limits (Fable…) from Claude Code's usage cache", isOn: $store.claudeModelLimits)
                 .onChange(of: store.claudeModelLimits) { _ in store.refresh() }
             Button("Copy Claude bridge configuration") {

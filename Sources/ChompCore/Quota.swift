@@ -87,18 +87,35 @@ public enum QuotaParser {
         guard let cache = root["cachedUsageUtilization"] as? [String: Any],
               let fetched = number(cache["fetchedAtMs"]), fetched > 0,
               let usage = cache["utilization"] as? [String: Any] else { return [] }
-        let observed = Date(timeIntervalSince1970: fetched / 1000)
+        // Weekly usage only rises until reset, so an old reading is still a valid floor:
+        // it goes stale at reset, not on age. The row shows its age instead.
+        return scopedRows(usage, observed: Date(timeIntervalSince1970: fetched / 1000), maxAge: 8 * 86_400, existing: [])
+    }
+    /// The usage endpoint Claude Code itself polls (GET /api/oauth/usage). Same shape as the snapshot's
+    /// `utilization`: five_hour and seven_day carry `utilization` as 0...100, limits[] carries per-model rows.
+    /// Ids match the bridge's so observations merge per window. Dollar, spend, and account fields are ignored.
+    public static func claudeUsage(_ data: Data, now: Date = Date(), maxAge: TimeInterval = 15 * 60) throws -> [Quota] {
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw ParseError.invalid }
+        let windows = [("five_hour", "Session"), ("seven_day", "Weekly")]
+        let quotas: [Quota] = windows.compactMap { key, title in
+            guard let w = root[key] as? [String: Any], let used = number(w["utilization"]),
+                  (0...100).contains(used) else { return nil }
+            var q = Quota(id: key, title: title, used: used, resetsAt: date(w["resets_at"]), observedAt: now)
+            q.maxAge = maxAge
+            return q
+        }
+        return quotas + scopedRows(root, observed: now, maxAge: maxAge, existing: quotas)
+    }
+    private static func scopedRows(_ usage: [String: Any], observed: Date, maxAge: TimeInterval, existing: [Quota]) -> [Quota] {
         var quotas: [Quota] = []
         for row in usage["limits"] as? [[String: Any]] ?? [] where row["kind"] as? String == "weekly_scoped" {
             guard let scope = row["scope"] as? [String: Any], let model = scope["model"] as? [String: Any],
                   let name = (model["display_name"] as? String)?.trimmingCharacters(in: .whitespaces),
                   !name.isEmpty, name.count <= 24, let used = number(row["percent"]), (0...100).contains(used),
-                  !quotas.contains(where: { $0.id == "model:" + name }) else { continue }
+                  !(existing + quotas).contains(where: { $0.id == "model:" + name }) else { continue }
             var q = Quota(id: "model:" + name, title: name + " weekly", used: used,
                           resetsAt: date(row["resets_at"]), observedAt: observed)
-            // Weekly usage only rises until reset, so an old reading is still a valid floor:
-            // it goes stale at reset, not on age. The row shows its age instead.
-            q.maxAge = 8 * 86_400
+            q.maxAge = maxAge
             quotas.append(q)
         }
         return quotas
