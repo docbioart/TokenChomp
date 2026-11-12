@@ -65,6 +65,14 @@ Not yet checked: Intel Macs, macOS 13–15, Reduce Motion, and Codex timeout rec
 
 Keep scope small: two quota readers, one model, one renderer, one dashboard. No plugin system or generic provider framework.
 
+## Status (2026-11-12)
+
+**Done and working:** everything above. `swift build` and `swift test` pass (9 core tests) with Swift 6.3 on macOS 26. The last change, committed 2026-11-12 after sitting uncommitted since 2026-10-07, is direct Claude polling: `Sources/TokenChomp/ClaudeDirect.swift` holds `ClaudeUsageProvider` (reads the Claude Code OAuth token from the Keychain through `/usr/bin/security`, GETs `https://api.anthropic.com/api/oauth/usage`, parses it with `QuotaParser.claudeUsage`) and `PowerState` (5-minute cadence on mains, 15 on battery or Low Power Mode). It exists so the session, weekly, and per-model rows stay fresh without the status-line bridge or the `~/.claude.json` cache (inferred from the code and the README text above). The installed `/Applications/TokenChomp.app` has the same build timestamp as this change, and a `local.tokenchomp.app` login item is registered, so that build is in daily use (inferred).
+
+**Not in git, on purpose:** `.build/`, `dist/TokenChomp.app` (rebuild with `bash scripts/build-app.sh`), Claude readings in `~/Library/Application Support/TokenChomp/claude.json`, preferences in UserDefaults (`claudeDirect`, `claudeModelLimits`, `widgetShowsAll`, ...). No secrets are stored by the app or the repo.
+
+**Open / next (inferred):** direct polling has not been added to the hand-checked list above; verify on a fresh machine that the `security` read does not prompt and that the "sign-in expired" and Keychain-denied paths show the right captions. `Package.swift` says Swift 5.9 tools and the CI workflow targets macos-14; the local build used Swift 6.3, so CI has not confirmed this change. No CLAUDE.md, TODO, or PLAN file exists; this README is the only agent-facing doc.
+
 ## License
 
 MIT. See [LICENSE](LICENSE). The license covers TokenChomp's own code only; TokenFish is a separate project with its own terms.
